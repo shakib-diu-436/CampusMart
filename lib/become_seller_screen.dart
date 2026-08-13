@@ -18,12 +18,127 @@ class BecomeSellerScreen extends StatefulWidget {
 
 class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   bool isLoading = false;
+  bool checkingStore = true;
+  bool hasStore = false;
 
-  Future<void> becomeSeller() async {
+  final storeNameController = TextEditingController();
+
+  final descriptionController = TextEditingController();
+
+  final logoUrlController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    checkExistingStore();
+  }
+
+  // ============================================================
+  // CHECK EXISTING STORE
+  // ============================================================
+
+  Future<void> checkExistingStore() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          checkingStore = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      // First check users/{uid}
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDoc.data();
+
+      final storeId = userData?['storeId'];
+
+      if (storeId != null && storeId.toString().trim().isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            hasStore = true;
+            checkingStore = false;
+          });
+        }
+        return;
+      }
+
+      // Fallback: check stores collection
+      final storeQuery = await FirebaseFirestore.instance
+          .collection('stores')
+          .where('ownerId', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (mounted) {
+        setState(() {
+          hasStore = storeQuery.docs.isNotEmpty;
+          checkingStore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          checkingStore = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    storeNameController.dispose();
+    descriptionController.dispose();
+    logoUrlController.dispose();
+    super.dispose();
+  }
+
+  // ============================================================
+  // CREATE STORE
+  // ============================================================
+
+  Future<void> createStore() async {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       showMessage('Please login first.', Colors.red);
+      return;
+    }
+
+    final storeName = storeNameController.text.trim();
+
+    final description = descriptionController.text.trim();
+
+    final logoUrl = logoUrlController.text.trim();
+
+    // Validation
+    if (storeName.isEmpty) {
+      showMessage('Please enter your store name.', Colors.orange);
+      return;
+    }
+
+    if (storeName.length < 3) {
+      showMessage('Store name must be at least 3 characters.', Colors.orange);
+      return;
+    }
+
+    if (description.isEmpty) {
+      showMessage('Please enter a short store description.', Colors.orange);
+      return;
+    }
+
+    if (description.length < 10) {
+      showMessage(
+        'Store description must be at least 10 characters.',
+        Colors.orange,
+      );
       return;
     }
 
@@ -32,25 +147,77 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     });
 
     try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
-        {'isSeller': true},
-      );
+      final firestore = FirebaseFirestore.instance;
+
+      // --------------------------------------------------------
+      // CHECK AGAIN BEFORE CREATING
+      // --------------------------------------------------------
+
+      final existingStoreQuery = await firestore
+          .collection('stores')
+          .where('ownerId', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (existingStoreQuery.docs.isNotEmpty) {
+        if (!mounted) return;
+
+        setState(() {
+          isLoading = false;
+          hasStore = true;
+        });
+
+        showMessage('You already have a store.', Colors.orange);
+
+        return;
+      }
+
+      // --------------------------------------------------------
+      // CREATE STORE
+      // --------------------------------------------------------
+
+      final storeRef = firestore.collection('stores').doc();
+
+      await storeRef.set({
+        'storeId': storeRef.id,
+        'storeName': storeName,
+        'description': description,
+        'logoUrl': logoUrl.isEmpty ? '' : logoUrl,
+        'ownerId': user.uid,
+        'ownerName': user.displayName ?? 'DIU Student',
+        'ownerEmail': user.email ?? '',
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // --------------------------------------------------------
+      // UPDATE USER
+      // --------------------------------------------------------
+
+      await firestore.collection('users').doc(user.uid).set({
+        'isSeller': true,
+        'storeId': storeRef.id,
+        'storeName': storeName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       if (!mounted) return;
 
       setState(() {
         isLoading = false;
+        hasStore = true;
       });
 
-      showMessage('You are now a seller! 🎉', diuGreen);
+      showMessage('Store created successfully! 🎉', diuGreen);
 
-      await Future.delayed(const Duration(milliseconds: 700));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const SellerDashboard()),
+        MaterialPageRoute(builder: (_) => const SellerDashboard()),
       );
     } catch (e) {
       if (!mounted) return;
@@ -59,11 +226,17 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         isLoading = false;
       });
 
-      showMessage('Could not activate seller account.', Colors.red);
+      showMessage('Could not create your store. Please try again.', Colors.red);
     }
   }
 
+  // ============================================================
+  // MESSAGE
+  // ============================================================
+
   void showMessage(String message, Color color) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -73,13 +246,203 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
   }
 
+  // ============================================================
+  // INPUT DECORATION
+  // ============================================================
+
+  InputDecoration inputDecoration({
+    required String label,
+    required String hint,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+
+      prefixIcon: Icon(icon, color: diuBlue),
+
+      filled: true,
+      fillColor: Colors.white,
+
+      labelStyle: const TextStyle(color: diuGray),
+
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: diuBlue, width: 1.5),
+      ),
+
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
+    // ----------------------------------------------------------
+    // CHECKING STORE
+    // ----------------------------------------------------------
+
+    if (checkingStore) {
+      return const Scaffold(
+        backgroundColor: backgroundColor,
+
+        body: Center(child: CircularProgressIndicator(color: diuBlue)),
+      );
+    }
+
+    // ----------------------------------------------------------
+    // USER ALREADY HAS STORE
+    // ----------------------------------------------------------
+
+    if (hasStore) {
+      return Scaffold(
+        backgroundColor: backgroundColor,
+
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+
+          elevation: 0,
+
+          leading: IconButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+
+            icon: const Icon(Icons.arrow_back_ios_new, color: diuGray),
+          ),
+
+          title: const Text(
+            'My Store',
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+
+                children: [
+                  Container(
+                    width: 88,
+                    height: 88,
+
+                    decoration: BoxDecoration(
+                      color: diuBlue.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: diuBlue,
+                      size: 48,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'You already have a store',
+
+                    textAlign: TextAlign.center,
+
+                    style: TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 23,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  const Text(
+                    'Manage your store, products and orders from your Seller Dashboard.',
+
+                    textAlign: TextAlign.center,
+
+                    style: TextStyle(color: diuGray, fontSize: 14, height: 1.5),
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  SizedBox(
+                    width: double.infinity,
+
+                    height: 55,
+
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SellerDashboard(),
+                          ),
+                        );
+                      },
+
+                      icon: const Icon(Icons.dashboard_rounded),
+
+                      label: const Text(
+                        'Open Seller Dashboard',
+
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: diuBlue,
+
+                        foregroundColor: Colors.white,
+
+                        elevation: 0,
+
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ----------------------------------------------------------
+    // NO STORE → CREATE STORE SCREEN
+    // ----------------------------------------------------------
+
     return Scaffold(
       backgroundColor: backgroundColor,
 
       appBar: AppBar(
         backgroundColor: Colors.white,
+
         elevation: 0,
 
         leading: IconButton(
@@ -91,7 +454,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         ),
 
         title: const Text(
-          'Become a Seller',
+          'Create Your Store',
+
           style: TextStyle(
             color: Color(0xFF111827),
             fontWeight: FontWeight.bold,
@@ -108,32 +472,35 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               constraints: const BoxConstraints(maxWidth: 600),
 
               child: Column(
-                children: [
-                  const SizedBox(height: 15),
+                crossAxisAlignment: CrossAxisAlignment.start,
 
-                  // =================================================
+                children: [
+                  // ==================================================
                   // HERO
-                  // =================================================
+                  // ==================================================
+
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(28),
+
+                    padding: const EdgeInsets.all(24),
 
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [diuBlue, Color(0xFF1769C2)],
 
                         begin: Alignment.topLeft,
+
                         end: Alignment.bottomRight,
                       ),
 
-                      borderRadius: BorderRadius.circular(25),
+                      borderRadius: BorderRadius.circular(22),
                     ),
 
                     child: Column(
                       children: [
                         Container(
-                          width: 82,
-                          height: 82,
+                          width: 75,
+                          height: 75,
 
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.15),
@@ -144,34 +511,34 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                           child: const Icon(
                             Icons.storefront_rounded,
                             color: Colors.white,
-                            size: 45,
+                            size: 42,
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
 
                         const Text(
-                          'Start Selling on CampusMart',
+                          'Create Your Student Store',
 
                           textAlign: TextAlign.center,
 
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 25,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
 
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
 
                         const Text(
-                          'Turn your products into opportunities and reach students across DIU.',
+                          'Create your own brand and showcase your products to the DIU student community.',
 
                           textAlign: TextAlign.center,
 
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 14,
+                            fontSize: 13,
                             height: 1.5,
                           ),
                         ),
@@ -181,60 +548,93 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                   const SizedBox(height: 25),
 
-                  // =================================================
-                  // BENEFITS
-                  // =================================================
-                  const Align(
-                    alignment: Alignment.centerLeft,
+                  // ==================================================
+                  // STORE INFORMATION
+                  // ==================================================
+                  const Text(
+                    'Store Information',
 
-                    child: Text(
-                      'Why become a seller?',
-
-                      style: TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    style: TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 6),
 
-                  benefitCard(
-                    icon: Icons.people_alt_outlined,
-                    title: 'Reach DIU Students',
-                    description:
-                        'Showcase your products to students across the campus.',
-                    color: diuBlue,
+                  const Text(
+                    'Create a brand identity for your CampusMart store.',
+
+                    style: TextStyle(color: diuGray, fontSize: 13),
                   ),
 
-                  benefitCard(
-                    icon: Icons.add_business_outlined,
-                    title: 'Easy Product Listing',
-                    description: 'Upload and manage your products directly from the app.',
-                    color: diuGreen,
+                  const SizedBox(height: 18),
+
+                  // STORE NAME
+                  TextField(
+                    controller: storeNameController,
+
+                    textCapitalization: TextCapitalization.words,
+
+                    decoration: inputDecoration(
+                      label: 'Store Name *',
+
+                      hint: 'e.g. CampusCraft',
+
+                      icon: Icons.storefront_outlined,
+                    ),
                   ),
 
-                  benefitCard(
-                    icon: Icons.trending_up_rounded,
-                    title: 'Grow Your Business',
-                    description: 'Build your seller profile and grow your customer base.',
-                    color: const Color(0xFFF59E0B),
+                  const SizedBox(height: 16),
+
+                  // DESCRIPTION
+                  TextField(
+                    controller: descriptionController,
+
+                    maxLines: 4,
+
+                    textCapitalization: TextCapitalization.sentences,
+
+                    decoration: inputDecoration(
+                      label: 'Store Description *',
+
+                      hint: 'Tell students what your store sells...',
+
+                      icon: Icons.description_outlined,
+                    ),
                   ),
 
-                  benefitCard(
-                    icon: Icons.verified_outlined,
-                    title: 'DIU Student Marketplace',
-                    description:
-                        'Sell within a trusted student-focused marketplace.',
-                    color: diuBlue,
+                  const SizedBox(height: 16),
+
+                  // LOGO URL
+                  TextField(
+                    controller: logoUrlController,
+
+                    keyboardType: TextInputType.url,
+
+                    decoration: inputDecoration(
+                      label: 'Store Logo URL (Optional)',
+
+                      hint: 'https://example.com/logo.png',
+
+                      icon: Icons.image_outlined,
+                    ),
                   ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 8),
 
-                  // =================================================
-                  // INFORMATION
-                  // =================================================
+                  const Text(
+                    'You can add a logo image URL now. Logo upload can be added later.',
+
+                    style: TextStyle(color: diuGray, fontSize: 11),
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  // ==================================================
+                  // STORE BENEFITS
+                  // ==================================================
                   Container(
                     width: double.infinity,
 
@@ -248,27 +648,40 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                       border: Border.all(color: const Color(0xFFE5E7EB)),
                     ),
 
-                    child: const Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
 
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          color: diuBlue,
-                          size: 22,
+                      children: const [
+                        Text(
+                          'Your store will include',
+
+                          style: TextStyle(
+                            color: Color(0xFF111827),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
 
-                        SizedBox(width: 10),
+                        SizedBox(height: 12),
 
-                        Expanded(
-                          child: Text(
-                            'Your buyer account will remain active. You can buy products and sell your own products using the same CampusMart account.',
-                            style: TextStyle(
-                              color: diuGray,
-                              fontSize: 13,
-                              height: 1.5,
-                            ),
-                          ),
+                        StoreFeature(
+                          icon: Icons.storefront,
+                          text: 'Your own store name and brand identity',
+                        ),
+
+                        StoreFeature(
+                          icon: Icons.inventory_2_outlined,
+                          text: 'All your store products in one place',
+                        ),
+
+                        StoreFeature(
+                          icon: Icons.people_outline,
+                          text: 'Reach DIU student customers',
+                        ),
+
+                        StoreFeature(
+                          icon: Icons.dashboard_outlined,
+                          text: 'Manage your products from Seller Dashboard',
                         ),
                       ],
                     ),
@@ -276,18 +689,20 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                   const SizedBox(height: 25),
 
-                  // =================================================
-                  // BUTTON
-                  // =================================================
+                  // ==================================================
+                  // CREATE BUTTON
+                  // ==================================================
                   SizedBox(
                     width: double.infinity,
+
                     height: 55,
 
                     child: ElevatedButton(
-                      onPressed: isLoading ? null : becomeSeller,
+                      onPressed: isLoading ? null : createStore,
 
                       style: ElevatedButton.styleFrom(
                         backgroundColor: diuGreen,
+
                         foregroundColor: Colors.white,
 
                         disabledBackgroundColor: diuGreen.withOpacity(0.5),
@@ -313,12 +728,13 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
 
                               children: [
-                                Icon(Icons.storefront_rounded),
+                                Icon(Icons.add_business_rounded),
 
                                 SizedBox(width: 9),
 
                                 Text(
-                                  'Become a Seller',
+                                  'Create Store',
+
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -331,13 +747,17 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                   const SizedBox(height: 15),
 
-                  const Text(
-                    'You can continue using CampusMart as a buyer.',
+                  const Center(
+                    child: Text(
+                      'You can continue using CampusMart as a buyer.',
 
-                    textAlign: TextAlign.center,
+                      textAlign: TextAlign.center,
 
-                    style: TextStyle(color: diuGray, fontSize: 12),
+                      style: TextStyle(color: diuGray, fontSize: 12),
+                    ),
                   ),
+
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -346,76 +766,45 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       ),
     );
   }
+}
 
-  // =============================================================
-  // BENEFIT CARD
-  // =============================================================
+// ================================================================
+// STORE FEATURE
+// ================================================================
 
-  Widget benefitCard({
-    required IconData icon,
-    required String title,
-    required String description,
-    required Color color,
-  }) {
-    return Container(
-      width: double.infinity,
+class StoreFeature extends StatelessWidget {
+  final IconData icon;
+  final String text;
 
-      margin: const EdgeInsets.only(bottom: 12),
+  const StoreFeature({super.key, required this.icon, required this.text});
 
-      padding: const EdgeInsets.all(16),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-
-        borderRadius: BorderRadius.circular(16),
-
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
 
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 34,
+            height: 34,
 
             decoration: BoxDecoration(
-              color: color.withOpacity(0.10),
+              color: diuBlue.withOpacity(0.08),
 
-              borderRadius: BorderRadius.circular(13),
+              borderRadius: BorderRadius.circular(9),
             ),
 
-            child: Icon(icon, color: color, size: 25),
+            child: Icon(icon, color: diuBlue, size: 19),
           ),
 
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
 
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Text(
+              text,
 
-              children: [
-                Text(
-                  title,
-
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  description,
-
-                  style: const TextStyle(
-                    color: diuGray,
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ],
+              style: const TextStyle(color: diuGray, fontSize: 12),
             ),
           ),
         ],
