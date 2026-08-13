@@ -1,357 +1,412 @@
-CampusMart
+# 🛍️ CampusMart DIU
 
-CampusMart -- DIU Student Marketplace
+### 🎓 A Student-Centric Marketplace & Service Platform for Daffodil International University
 
-A student-focused marketplace platform designed for DaffodilInternational University (DIU) students. CampusMart allows students tobuy products, sell products, and interact through a single account.
+**CampusMart** is a student-focused digital marketplace designed for the **Daffodil International University (DIU)** community.
 
-Overview
+The platform allows students to **buy and sell products, offer services, find skilled students, and connect with tutors or learners** — all within a single campus-focused ecosystem.
 
-CampusMart is being developed as a cross-platform application usingFlutter. The same project can provide:
+---
 
-Android mobile application
+## ✨ Features
 
-Responsive Web application
+### 🛒 Product Marketplace
 
-Firebase-powered backend services
-
-The platform is designed so that a user can be both a buyer and a sellerfrom the same account.
-
-Core Account Model
-
-CampusMart does not use separate buyer and seller accounts.
-
-Each user has capability flags:
-
-isBuyer: true/false
-isSeller: true/false
-
-New users can start as buyers:
-
-isBuyer: true
-isSeller: false
-
-A buyer can later enable seller functionality without creating anotheraccount.
-
-Main Features
-
-Buyer
-
-Browse products
-
-Search and filter products
-
-View product details
-
-View seller information
-
-Add products to cart
-
-Place orders
-
-Track orders
-
-Manage profile
-
-Seller
-
-Become a seller from the existing account
-
-Create product listings
-
-Upload product images
-
-Edit and delete listings
-
-Manage inventory
-
-View orders
-
-Manage seller profile
-
-Platform
-
-Firebase Authentication
-
-Cloud Firestore database
-
-Cloud Storage for product/user images
-
-Firebase Cloud Messaging for notifications
-
-Firebase Hosting for the web application
-
-Responsive Flutter Web interface
-
-Technology Stack
-
-Component              Technology
-
-Mobile App             Flutter / DartWeb App                Flutter WebAuthentication         Firebase AuthenticationDatabase               Cloud FirestoreImage Storage          Firebase Cloud StorageNotifications          Firebase Cloud MessagingWeb Hosting            Firebase HostingAndroid Distribution   Google Play StoreDomain                 Custom domain such as campusmart.com
-
-Architecture
-
-                         CAMPUSMART
-                              |
-                +-------------+-------------+
-                |                           |
-          Android App                   Web App
-            Flutter                   Flutter Web
-                |                           |
-                +-------------+-------------+
-                              |
-                         Firebase
-                +-------------+-------------+
-                |             |             |
-              Auth        Firestore      Storage
-                |             |             |
-             Users        Products        Images
-                         Orders
-                         Reviews
-                              |
-                         Notifications
-                              |
-                            FCM
-
-App + Website Deployment
-
-The same Flutter project can generate both the Android application andweb application.
-
-Android
-
-flutter build appbundle
-
-The generated Android App Bundle can be submitted to Google PlayConsole.
-
-Web
-
-flutter build web
-
-Flutter generates the web build inside:
-
-build/web/
-
-That build can be deployed to Firebase Hosting.
-
-Example flow:
-
-Flutter Project
-      |
-      +---- flutter build appbundle
-      |             |
-      |          Play Store
-      |             |
-      |          Android App
-      |
-      +---- flutter build web
-                    |
-             Firebase Hosting
-                    |
-             campusmart.com
-                    |
-              Flutter Web
-
-Firebase Data Structure
-
-A possible Firestore structure:
-
-users/
-  userId/
-    name
-    email
-    phone
-    profileImageUrl
-    isBuyer
-    isSeller
-    createdAt
-
-products/
-  productId/
-    sellerId
-    title
-    description
-    price
-    category
-    imageUrls
-    stock
-    createdAt
-    updatedAt
-
-orders/
-  orderId/
-    buyerId
-    sellerId
-    items
-    totalAmount
-    status
-    createdAt
-
-categories/
-  categoryId/
-    name
-    imageUrl
-
-Image Upload Flow
-
-Customer/seller images should be stored in Firebase Cloud Storage ratherthan directly inside Firestore.
-
-User selects image
-       |
-       v
-Flutter App / Web
-       |
-       v
-Firebase Cloud Storage
-       |
-       v
-Download URL
-       |
-       v
-Firestore product document
-
-Firestore stores the image URL and product information, while CloudStorage stores the actual image files.
-
-Firebase Production Plan
-
-For production image uploads and other paid Firebase services, theproject may use the Firebase Blaze pay-as-you-go plan.
-
-Blaze does not have a fixed monthly subscription fee. Charges depend onactual resource usage and applicable no-cost quotas.
-
-Recommended production safeguards:
-
-Enable billing alerts
-
-Set a reasonable Google Cloud budget
-
-Restrict Firebase Storage rules
-
-Restrict Firestore security rules
-
-Validate uploaded file types
-
-Limit image sizes
-
-Compress images before upload
-
-Do not expose private user data
-
-Recommended Project Structure
-
-campus_mart/
-|
-+-- lib/
-|   +-- models/
-|   +-- services/
-|   +-- screens/
-|   +-- widgets/
-|   +-- providers/
-|   +-- utils/
-|   +-- firebase_options.dart
-|   +-- main.dart
-|
-+-- android/
-+-- ios/
-+-- web/
-+-- assets/
-+-- test/
-+-- pubspec.yaml
-+-- README.md
-
-Development
-
-Requirements
-
-Flutter SDK
-
-Dart SDK
-
-Android Studio or VS Code
-
-Firebase project
-
-Firebase CLI
-
-FlutterFire CLI
-
-Install dependencies
-
+* Browse products listed by DIU students
+* Product categories
+* Product images and descriptions
+* Product details
+* Add products to cart
+* Quantity management
+* Checkout and order placement
+* Seller information
+* Order status tracking
+
+### 💼 Student Services Marketplace
+
+Students can turn their skills into services and offer them to other students.
+
+Examples:
+
+* 💻 Programming & Development
+* 🎨 Graphic Design
+* 📹 Video Editing
+* 📸 Photography
+* 📝 Content Writing
+* 📊 Data Entry
+* 📱 Social Media Management
+* 🎤 Event Services
+* And more
+
+Students can:
+
+* Create service listings
+* Set pricing
+* Describe their skills
+* Receive service requests
+* Connect with potential clients
+
+### 📚 Tuition Marketplace
+
+CampusMart also connects students who need academic support with students who can provide tutoring.
+
+Students can:
+
+* Offer tuition
+* Find tuition opportunities
+* Browse subjects
+* Set preferred teaching locations
+* Specify class level
+* Set expected fees
+* Apply/book tuition opportunities
+
+### 🛍️ Cart & Orders
+
+* Add products to cart
+* Manage quantities
+* View subtotal
+* Delivery fee calculation
+* Place orders
+* Order status
+* Payment status
+* Seller-based order management
+
+### 👤 Student Profile
+
+* Student profile
+* Personal information
+* My products
+* My services
+* My tuition
+* Orders
+* Seller-related information
+
+### 🔐 Authentication
+
+* Firebase Authentication
+* DIU email-based login
+* Email verification
+* Secure user sessions
+
+### ☁️ Firebase Backend
+
+CampusMart uses Firebase services for backend functionality, including:
+
+* Firebase Authentication
+* Cloud Firestore
+* Firebase-based data management
+
+---
+
+## 🏗️ Application Architecture
+
+```text
+                    CampusMart
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
+   Marketplace       Services         Tuition
+        │               │               │
+    Products        Skills/Jobs       Tutoring
+        │               │               │
+        └───────────────┼───────────────┘
+                        │
+                     Users
+                        │
+          ┌─────────────┼─────────────┐
+          │             │             │
+        Buyer         Seller        Student
+          │             │             │
+          └─────────────┼─────────────┘
+                        │
+                     Firebase
+```
+
+---
+
+## 📱 Main Navigation
+
+CampusMart uses a centralized navigation system:
+
+```text
+┌─────────────────────────────────────────────┐
+│                                             │
+│              Current Screen                 │
+│                                             │
+├─────────────────────────────────────────────┤
+│ 🏠 Home │ 🛍 Market │ ➕ Sell │ 🛒 Cart │ 👤 Profile │
+└─────────────────────────────────────────────┘
+```
+
+The main sections are:
+
+* 🏠 Home
+* 🛍️ Market
+* ➕ Sell
+* 🛒 Cart
+* 👤 Profile
+
+---
+
+## 🧰 Technology Stack
+
+| Technology                   | Purpose                           |
+| ---------------------------- | --------------------------------- |
+| **Flutter**                  | Cross-platform mobile application |
+| **Dart**                     | Application programming language  |
+| **Firebase Authentication**  | User authentication               |
+| **Cloud Firestore**          | Database                          |
+| **Firebase Storage**         | Image/file storage                |
+| **Git & GitHub**             | Version control                   |
+| **Android Studio / VS Code** | Development                       |
+
+---
+
+## 📂 Project Structure
+
+```text
+lib/
+│
+├── main.dart
+├── main_navigation_screen.dart
+│
+├── home_screen.dart
+├── marketplace_screen.dart
+├── product_details_screen.dart
+│
+├── become_seller_screen.dart
+├── cart_screen.dart
+├── profile_screen.dart
+│
+├── service/
+│   └── service-related screens
+│
+├── tuition/
+│   └── tuition-related screens
+│
+└── firebase_options.dart
+```
+
+> Project structure may change as CampusMart continues to evolve.
+
+---
+
+## 🔥 Firestore Collections
+
+The application uses Firestore to manage major application data.
+
+```text
+Firestore
+│
+├── users
+│
+├── products
+│
+├── services
+│
+├── tuition
+│
+├── orders
+│
+└── ...
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/shakib-diu-436/CampusMart.git
+```
+
+### 2. Open the project
+
+```bash
+cd CampusMart
+```
+
+### 3. Install dependencies
+
+```bash
 flutter pub get
+```
 
-Run Android
+### 4. Configure Firebase
 
+Make sure your Firebase configuration is properly connected to the Flutter project.
+
+### 5. Run the application
+
+```bash
 flutter run
+```
 
-Run Web
+---
 
-flutter run -d chrome
+## 📦 Build APK
 
-Build Android
+### Debug APK
 
+For testing:
+
+```bash
+flutter build apk --debug
+```
+
+Generated APK:
+
+```text
+build/app/outputs/flutter-apk/app-debug.apk
+```
+
+### Release APK
+
+For production builds:
+
+```bash
+flutter build apk --release
+```
+
+### Android App Bundle
+
+For Google Play Store:
+
+```bash
 flutter build appbundle --release
+```
 
-Build Web
+---
 
-flutter build web --release
+## 🧪 Current Development Status
 
-Firebase Setup
+CampusMart is currently under active development.
 
-After creating a Firebase project:
+### Implemented
 
-firebase login
+* [x] Firebase Authentication
+* [x] DIU email verification
+* [x] Product marketplace
+* [x] Product details
+* [x] Cart
+* [x] Seller functionality
+* [x] Orders
+* [x] Services marketplace
+* [x] Tuition marketplace
+* [x] Student profile
+* [x] Firebase database integration
+* [x] Main application navigation
 
-Then configure FlutterFire:
+### In Development / Improvement
 
-flutterfire configure
+* [ ] Advanced service booking
+* [ ] Advanced tuition booking
+* [ ] Improved search and filtering
+* [ ] Rating & review system
+* [ ] Notifications
+* [ ] Online payment integration
+* [ ] Chat between buyers and sellers
+* [ ] Production optimization
+* [ ] Google Play Store release
 
-This generates the Firebase configuration required by the Flutterapplication.
+---
 
-Production Checklist
+## 🔐 Security
 
-Before publishing CampusMart:
+CampusMart is designed with student account security in mind.
 
-Configure Firebase Authentication
+Important configuration files and credentials should **never be committed to a public repository**.
 
-Configure Firestore security rules
+Before pushing code:
 
-Configure Cloud Storage security rules
+```bash
+git status
+```
 
-Configure Firebase Cloud Messaging
+Review changed files and make sure no private keys, passwords, API secrets, or sensitive credentials are included.
 
-Add image compression and upload limits
+---
 
-Add error handling
+## 🔄 Development Workflow
 
-Add loading and empty states
+CampusMart follows a Git-based development workflow.
 
-Test Android release build
+```text
+Write Code
+    ↓
+Test Application
+    ↓
+Fix Bugs
+    ↓
+git add .
+    ↓
+git commit
+    ↓
+git push
+    ↓
+GitHub Backup
+```
 
-Test responsive web layout
+Example:
 
-Deploy Flutter Web to Firebase Hosting
+```bash
+git add .
+git commit -m "Update marketplace navigation"
+git push
+```
 
-Connect custom domain
+---
 
-Configure Play Console
+## 📌 Project Vision
 
-Create privacy policy
+CampusMart aims to create a **trusted digital ecosystem for university students** where students can:
 
-Create terms and conditions
+> **Buy → Sell → Work → Teach → Learn**
 
-Configure Firebase/Google Cloud billing alerts
+Instead of using multiple external platforms, students can discover products, services, skills, and tuition opportunities within their own university community.
 
-Perform security testing
+---
 
-Perform final production testing
+## 🎯 Future Vision
 
-Project Goal
+The long-term goal is to expand CampusMart into a complete university ecosystem featuring:
 
-CampusMart aims to provide a trusted, convenient, and campus-focusedmarketplace where DIU students can:
+* 🛒 Student Marketplace
+* 💼 Student Freelancing
+* 📚 Tuition & Tutoring
+* 💳 Digital Payments
+* 💬 Student-to-Student Chat
+* ⭐ Ratings & Reviews
+* 🔔 Notifications
+* 📍 Campus-based Discovery
+* 🏫 University-specific Communities
 
-Buy products from fellow students
+---
 
-Sell their own products
+## 👨‍💻 Developer
 
-Discover useful campus-related products and services
+**Shakib**
 
-Manage buying and selling from one account
+Computer Science & Engineering
+Daffodil International University
 
-CampusMart -- Built for students, by students.
+---
+
+## 📄 License
+
+This project is currently developed as an academic/personal project.
+
+License and distribution terms may be updated in the future.
+
+---
+
+<p align="center">
+
+### 🛍️ CampusMart DIU
+
+**Buy • Sell • Work • Teach • Learn**
+
+Made with ❤️ for the DIU student community.
+
+</p>
