@@ -4,19 +4,157 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'my_products_screen.dart';
 import 'add_product_screen.dart';
+import 'store_screen.dart';
+import 'seller_orders_screen.dart';
 
 const Color diuBlue = Color(0xFF034EA2);
 const Color diuGreen = Color(0xFF39B54A);
 const Color diuGray = Color(0xFF636466);
 const Color backgroundColor = Color(0xFFF6F8FB);
 
-class SellerDashboard extends StatelessWidget {
+class SellerDashboard extends StatefulWidget {
   const SellerDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+  State<SellerDashboard> createState() => _SellerDashboardState();
+}
 
+class _SellerDashboardState extends State<SellerDashboard> {
+  final user = FirebaseAuth.instance.currentUser;
+
+  String storeName = 'My Store';
+  String storeId = '';
+  String storeDescription = '';
+  String logoUrl = '';
+  bool loadingStore = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadStore();
+  }
+
+  Future<void> loadStore() async {
+    if (user == null) {
+      setState(() {
+        loadingStore = false;
+      });
+      return;
+    }
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+
+      // First check users document
+      final userDoc = await firestore.collection('users').doc(user!.uid).get();
+
+      final userData = userDoc.data();
+
+      final savedStoreId = userData?['storeId']?.toString() ?? '';
+      final savedStoreName = userData?['storeName']?.toString() ?? '';
+
+      if (savedStoreId.isNotEmpty) {
+        final storeDoc = await firestore
+            .collection('stores')
+            .doc(savedStoreId)
+            .get();
+
+        if (storeDoc.exists) {
+          final data = storeDoc.data()!;
+
+          if (!mounted) return;
+
+          setState(() {
+            storeId = savedStoreId;
+            storeName = data['storeName']?.toString().trim().isNotEmpty == true
+                ? data['storeName'].toString()
+                : savedStoreName.isNotEmpty
+                ? savedStoreName
+                : 'My Store';
+
+            storeDescription = data['description']?.toString() ?? '';
+
+            logoUrl = data['logoUrl']?.toString() ?? '';
+
+            loadingStore = false;
+          });
+
+          return;
+        }
+      }
+
+      // Fallback: search store by ownerId
+      final storeQuery = await firestore
+          .collection('stores')
+          .where('ownerId', isEqualTo: user!.uid)
+          .limit(1)
+          .get();
+
+      if (storeQuery.docs.isNotEmpty) {
+        final doc = storeQuery.docs.first;
+        final data = doc.data();
+
+        if (!mounted) return;
+
+        setState(() {
+          storeId = doc.id;
+          storeName = data['storeName']?.toString().trim().isNotEmpty == true
+              ? data['storeName'].toString()
+              : 'My Store';
+
+          storeDescription = data['description']?.toString() ?? '';
+
+          logoUrl = data['logoUrl']?.toString() ?? '';
+
+          loadingStore = false;
+        });
+      } else {
+        if (!mounted) return;
+
+        setState(() {
+          storeName = 'My Store';
+          loadingStore = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load Store Error: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        loadingStore = false;
+      });
+    }
+  }
+
+  // ============================================================
+  // OPEN MY STORE
+  // ============================================================
+
+  Future<void> openMyStore() async {
+    if (user == null) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StoreScreen(sellerId: user!.uid, storeId: storeId),
+      ),
+    );
+  }
+
+  // ============================================================
+  // OPEN ORDERS
+  // ============================================================
+
+  Future<void> openOrders() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SellerOrdersScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
 
@@ -44,7 +182,6 @@ class SellerDashboard extends StatelessWidget {
             onPressed: () {},
             icon: const Icon(Icons.notifications_none_rounded, color: diuGray),
           ),
-
           const SizedBox(width: 8),
         ],
       ),
@@ -59,7 +196,6 @@ class SellerDashboard extends StatelessWidget {
 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-
                 children: [
                   // =====================================================
                   // SELLER HEADER
@@ -75,12 +211,12 @@ class SellerDashboard extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-
                       borderRadius: BorderRadius.circular(22),
                     ),
 
                     child: Row(
                       children: [
+                        // STORE LOGO
                         Container(
                           width: 65,
                           height: 65,
@@ -90,11 +226,26 @@ class SellerDashboard extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
 
-                          child: const Icon(
-                            Icons.storefront_rounded,
-                            color: Colors.white,
-                            size: 34,
-                          ),
+                          child: logoUrl.trim().isEmpty
+                              ? const Icon(
+                                  Icons.storefront_rounded,
+                                  color: Colors.white,
+                                  size: 34,
+                                )
+                              : ClipOval(
+                                  child: Image.network(
+                                    logoUrl,
+                                    fit: BoxFit.cover,
+
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.storefront_rounded,
+                                        color: Colors.white,
+                                        size: 34,
+                                      );
+                                    },
+                                  ),
+                                ),
                         ),
 
                         const SizedBox(width: 16),
@@ -114,19 +265,30 @@ class SellerDashboard extends StatelessWidget {
 
                               const SizedBox(height: 3),
 
-                              const Text(
-                                'CampusMart Seller',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              loadingStore
+                                  ? const SizedBox(
+                                      height: 25,
+                                      width: 25,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      storeName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
 
                               const SizedBox(height: 5),
 
-                              Row(
-                                children: const [
+                              const Row(
+                                children: [
                                   Icon(
                                     Icons.verified_rounded,
                                     color: Colors.white,
@@ -152,7 +314,7 @@ class SellerDashboard extends StatelessWidget {
                   const SizedBox(height: 25),
 
                   // =====================================================
-                  // STATISTICS
+                  // OVERVIEW
                   // =====================================================
                   const Text(
                     'Overview',
@@ -192,11 +354,24 @@ class SellerDashboard extends StatelessWidget {
                           const SizedBox(width: 12),
 
                           Expanded(
-                            child: statCard(
-                              icon: Icons.shopping_bag_outlined,
-                              title: 'Orders',
-                              value: '0',
-                              color: diuGreen,
+                            child: StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('orders')
+                                  .where('sellerIds', arrayContains: user?.uid)
+                                  .snapshots(),
+
+                              builder: (context, snapshot) {
+                                final count = snapshot.hasData
+                                    ? snapshot.data!.docs.length
+                                    : 0;
+
+                                return statCard(
+                                  icon: Icons.shopping_bag_outlined,
+                                  title: 'Orders',
+                                  value: count.toString(),
+                                  color: diuGreen,
+                                );
+                              },
                             ),
                           ),
 
@@ -236,17 +411,24 @@ class SellerDashboard extends StatelessWidget {
                       Expanded(
                         child: actionCard(
                           context,
+
                           icon: Icons.add_box_rounded,
+
                           title: 'Add Product',
+
                           subtitle: 'List a new product',
+
                           color: diuGreen,
+
                           onTap: () async {
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const AddProductScreen(),
+                                builder: (_) => const AddProductScreen(),
                               ),
                             );
+
+                            setState(() {});
                           },
                         ),
                       ),
@@ -256,15 +438,20 @@ class SellerDashboard extends StatelessWidget {
                       Expanded(
                         child: actionCard(
                           context,
+
                           icon: Icons.inventory_2_rounded,
+
                           title: 'My Products',
+
                           subtitle: 'Manage your listings',
+
                           color: diuBlue,
+
                           onTap: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const MyProductsScreen(),
+                                builder: (_) => const MyProductsScreen(),
                               ),
                             );
                           },
@@ -277,27 +464,39 @@ class SellerDashboard extends StatelessWidget {
 
                   Row(
                     children: [
+                      // ORDERS
                       Expanded(
                         child: actionCard(
                           context,
+
                           icon: Icons.receipt_long_rounded,
+
                           title: 'Orders',
+
                           subtitle: 'View customer orders',
+
                           color: const Color(0xFFF59E0B),
-                          onTap: () {},
+
+                          onTap: openOrders,
                         ),
                       ),
 
                       const SizedBox(width: 14),
 
+                      // MY STORE
                       Expanded(
                         child: actionCard(
                           context,
+
                           icon: Icons.storefront_rounded,
+
                           title: 'My Store',
+
                           subtitle: 'View your storefront',
+
                           color: diuBlue,
-                          onTap: () {},
+
+                          onTap: openMyStore,
                         ),
                       ),
                     ],
@@ -310,14 +509,11 @@ class SellerDashboard extends StatelessWidget {
                   // =====================================================
                   Container(
                     width: double.infinity,
-
                     padding: const EdgeInsets.all(18),
 
                     decoration: BoxDecoration(
                       color: Colors.white,
-
                       borderRadius: BorderRadius.circular(18),
-
                       border: Border.all(color: const Color(0xFFE5E7EB)),
                     ),
 
@@ -354,7 +550,6 @@ class SellerDashboard extends StatelessWidget {
 
                           decoration: BoxDecoration(
                             color: const Color(0xFFEAF7ED),
-
                             borderRadius: BorderRadius.circular(12),
                           ),
 
@@ -383,6 +578,18 @@ class SellerDashboard extends StatelessWidget {
                         ),
 
                         const SizedBox(height: 12),
+
+                        if (storeName.isNotEmpty)
+                          Text(
+                            storeName,
+                            style: const TextStyle(
+                              color: Color(0xFF111827),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+
+                        const SizedBox(height: 4),
 
                         Text(
                           user?.email ?? 'DIU Account',
@@ -417,9 +624,7 @@ class SellerDashboard extends StatelessWidget {
 
       decoration: BoxDecoration(
         color: Colors.white,
-
         borderRadius: BorderRadius.circular(16),
-
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
 
@@ -472,7 +677,6 @@ class SellerDashboard extends StatelessWidget {
   }) {
     return InkWell(
       borderRadius: BorderRadius.circular(17),
-
       onTap: onTap,
 
       child: Container(
@@ -480,9 +684,7 @@ class SellerDashboard extends StatelessWidget {
 
         decoration: BoxDecoration(
           color: Colors.white,
-
           borderRadius: BorderRadius.circular(17),
-
           border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
 
