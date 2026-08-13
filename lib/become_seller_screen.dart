@@ -18,79 +18,12 @@ class BecomeSellerScreen extends StatefulWidget {
 
 class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   bool isLoading = false;
-  bool checkingStore = true;
-  bool hasStore = false;
 
-  final storeNameController = TextEditingController();
+  final TextEditingController storeNameController = TextEditingController();
 
-  final descriptionController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
 
-  final logoUrlController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    checkExistingStore();
-  }
-
-  // ============================================================
-  // CHECK EXISTING STORE
-  // ============================================================
-
-  Future<void> checkExistingStore() async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      if (mounted) {
-        setState(() {
-          checkingStore = false;
-        });
-      }
-      return;
-    }
-
-    try {
-      // First check users/{uid}
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      final userData = userDoc.data();
-
-      final storeId = userData?['storeId'];
-
-      if (storeId != null && storeId.toString().trim().isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            hasStore = true;
-            checkingStore = false;
-          });
-        }
-        return;
-      }
-
-      // Fallback: check stores collection
-      final storeQuery = await FirebaseFirestore.instance
-          .collection('stores')
-          .where('ownerId', isEqualTo: user.uid)
-          .limit(1)
-          .get();
-
-      if (mounted) {
-        setState(() {
-          hasStore = storeQuery.docs.isNotEmpty;
-          checkingStore = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          checkingStore = false;
-        });
-      }
-    }
-  }
+  final TextEditingController logoUrlController = TextEditingController();
 
   @override
   void dispose() {
@@ -118,7 +51,10 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
     final logoUrl = logoUrlController.text.trim();
 
-    // Validation
+    // ==========================================================
+    // VALIDATION
+    // ==========================================================
+
     if (storeName.isEmpty) {
       showMessage('Please enter your store name.', Colors.orange);
       return;
@@ -142,6 +78,10 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       return;
     }
 
+    // ==========================================================
+    // LOADING
+    // ==========================================================
+
     setState(() {
       isLoading = true;
     });
@@ -149,9 +89,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     try {
       final firestore = FirebaseFirestore.instance;
 
-      // --------------------------------------------------------
-      // CHECK AGAIN BEFORE CREATING
-      // --------------------------------------------------------
+      // ========================================================
+      // CHECK EXISTING STORE
+      // ========================================================
 
       final existingStoreQuery = await firestore
           .collection('stores')
@@ -164,54 +104,119 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
         setState(() {
           isLoading = false;
-          hasStore = true;
         });
 
         showMessage('You already have a store.', Colors.orange);
 
+        await Future.delayed(const Duration(milliseconds: 700));
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const SellerDashboard()),
+        );
+
         return;
       }
 
-      // --------------------------------------------------------
-      // CREATE STORE
-      // --------------------------------------------------------
+      // ========================================================
+      // STORE REFERENCE
+      // ========================================================
 
       final storeRef = firestore.collection('stores').doc();
 
+      // ========================================================
+      // OWNER INFORMATION
+      // ========================================================
+
+      final ownerName = user.displayName?.trim().isNotEmpty == true
+          ? user.displayName!.trim()
+          : 'DIU Student';
+
+      final ownerEmail = user.email ?? '';
+
+      // Firebase Authentication profile photo
+      final ownerPhotoUrl = user.photoURL ?? '';
+
+      // ========================================================
+      // CREATE STORE
+      // ========================================================
+
       await storeRef.set({
+        // ------------------------------------------------------
+        // STORE BASIC INFORMATION
+        // ------------------------------------------------------
+
         'storeId': storeRef.id,
+
         'storeName': storeName,
+
         'description': description,
-        'logoUrl': logoUrl.isEmpty ? '' : logoUrl,
+
+        // Store logo supplied by seller
+        'logoUrl': logoUrl,
+
+        // ------------------------------------------------------
+        // OWNER INFORMATION
+        // ------------------------------------------------------
         'ownerId': user.uid,
-        'ownerName': user.displayName ?? 'DIU Student',
-        'ownerEmail': user.email ?? '',
+
+        'ownerName': ownerName,
+
+        'ownerEmail': ownerEmail,
+
+        // Firebase profile photo
+        'ownerPhotoUrl': ownerPhotoUrl,
+
+        // ------------------------------------------------------
+        // FOLLOW SYSTEM
+        // ------------------------------------------------------
+        'followerCount': 0,
+
+        // ------------------------------------------------------
+        // STORE STATUS
+        // ------------------------------------------------------
         'isActive': true,
+
+        // ------------------------------------------------------
+        // TIMESTAMPS
+        // ------------------------------------------------------
         'createdAt': FieldValue.serverTimestamp(),
+
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // --------------------------------------------------------
-      // UPDATE USER
-      // --------------------------------------------------------
+      // ========================================================
+      // UPDATE USER DOCUMENT
+      // ========================================================
 
       await firestore.collection('users').doc(user.uid).set({
         'isSeller': true,
+
         'storeId': storeRef.id,
+
         'storeName': storeName,
+
+        // Save seller's profile photo too
+        'photoURL': ownerPhotoUrl,
+
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
+      // ========================================================
+      // SUCCESS
+      // ========================================================
 
       if (!mounted) return;
 
       setState(() {
         isLoading = false;
-        hasStore = true;
       });
 
       showMessage('Store created successfully! 🎉', diuGreen);
 
-      await Future.delayed(const Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 900));
 
       if (!mounted) return;
 
@@ -220,6 +225,10 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         MaterialPageRoute(builder: (_) => const SellerDashboard()),
       );
     } catch (e) {
+      // ========================================================
+      // ERROR
+      // ========================================================
+
       if (!mounted) return;
 
       setState(() {
@@ -227,6 +236,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       });
 
       showMessage('Could not create your store. Please try again.', Colors.red);
+
+      debugPrint('Create Store Error: $e');
     }
   }
 
@@ -240,7 +251,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
+
         backgroundColor: color,
+
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -257,11 +270,13 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }) {
     return InputDecoration(
       labelText: label,
+
       hintText: hint,
 
       prefixIcon: Icon(icon, color: diuBlue),
 
       filled: true,
+
       fillColor: Colors.white,
 
       labelStyle: const TextStyle(color: diuGray),
@@ -270,16 +285,19 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
+
         borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
 
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
+
         borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
 
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
+
         borderSide: const BorderSide(color: diuBlue, width: 1.5),
       ),
 
@@ -293,153 +311,12 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ----------------------------------------------------------
-    // CHECKING STORE
-    // ----------------------------------------------------------
-
-    if (checkingStore) {
-      return const Scaffold(
-        backgroundColor: backgroundColor,
-
-        body: Center(child: CircularProgressIndicator(color: diuBlue)),
-      );
-    }
-
-    // ----------------------------------------------------------
-    // USER ALREADY HAS STORE
-    // ----------------------------------------------------------
-
-    if (hasStore) {
-      return Scaffold(
-        backgroundColor: backgroundColor,
-
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-
-          elevation: 0,
-
-          leading: IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-
-            icon: const Icon(Icons.arrow_back_ios_new, color: diuGray),
-          ),
-
-          title: const Text(
-            'My Store',
-            style: TextStyle(
-              color: Color(0xFF111827),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-
-                    decoration: BoxDecoration(
-                      color: diuBlue.withOpacity(0.08),
-                      shape: BoxShape.circle,
-                    ),
-
-                    child: const Icon(
-                      Icons.storefront_rounded,
-                      color: diuBlue,
-                      size: 48,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    'You already have a store',
-
-                    textAlign: TextAlign.center,
-
-                    style: TextStyle(
-                      color: Color(0xFF111827),
-                      fontSize: 23,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  const Text(
-                    'Manage your store, products and orders from your Seller Dashboard.',
-
-                    textAlign: TextAlign.center,
-
-                    style: TextStyle(color: diuGray, fontSize: 14, height: 1.5),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  SizedBox(
-                    width: double.infinity,
-
-                    height: 55,
-
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SellerDashboard(),
-                          ),
-                        );
-                      },
-
-                      icon: const Icon(Icons.dashboard_rounded),
-
-                      label: const Text(
-                        'Open Seller Dashboard',
-
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: diuBlue,
-
-                        foregroundColor: Colors.white,
-
-                        elevation: 0,
-
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // ----------------------------------------------------------
-    // NO STORE → CREATE STORE SCREEN
-    // ----------------------------------------------------------
-
     return Scaffold(
       backgroundColor: backgroundColor,
 
+      // ========================================================
+      // APP BAR
+      // ========================================================
       appBar: AppBar(
         backgroundColor: Colors.white,
 
@@ -458,11 +335,15 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
           style: TextStyle(
             color: Color(0xFF111827),
+
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
 
+      // ========================================================
+      // BODY
+      // ========================================================
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -500,6 +381,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                       children: [
                         Container(
                           width: 75,
+
                           height: 75,
 
                           decoration: BoxDecoration(
@@ -510,7 +392,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                           child: const Icon(
                             Icons.storefront_rounded,
+
                             color: Colors.white,
+
                             size: 42,
                           ),
                         ),
@@ -524,7 +408,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                           style: TextStyle(
                             color: Colors.white,
+
                             fontSize: 24,
+
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -538,7 +424,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                           style: TextStyle(
                             color: Colors.white70,
+
                             fontSize: 13,
+
                             height: 1.5,
                           ),
                         ),
@@ -556,7 +444,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                     style: TextStyle(
                       color: Color(0xFF111827),
+
                       fontSize: 20,
+
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -571,7 +461,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                   const SizedBox(height: 18),
 
+                  // ==================================================
                   // STORE NAME
+                  // ==================================================
                   TextField(
                     controller: storeNameController,
 
@@ -588,7 +480,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                   const SizedBox(height: 16),
 
+                  // ==================================================
                   // DESCRIPTION
+                  // ==================================================
                   TextField(
                     controller: descriptionController,
 
@@ -607,7 +501,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                   const SizedBox(height: 16),
 
+                  // ==================================================
                   // LOGO URL
+                  // ==================================================
                   TextField(
                     controller: logoUrlController,
 
@@ -625,7 +521,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                   const SizedBox(height: 8),
 
                   const Text(
-                    'You can add a logo image URL now. Logo upload can be added later.',
+                    'Add a direct image URL for your store logo. If empty, your profile picture will be used automatically.',
 
                     style: TextStyle(color: diuGray, fontSize: 11),
                   ),
@@ -633,7 +529,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                   const SizedBox(height: 25),
 
                   // ==================================================
-                  // STORE BENEFITS
+                  // FEATURES
                   // ==================================================
                   Container(
                     width: double.infinity,
@@ -657,30 +553,36 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                           style: TextStyle(
                             color: Color(0xFF111827),
+
                             fontSize: 15,
+
                             fontWeight: FontWeight.bold,
                           ),
                         ),
 
                         SizedBox(height: 12),
 
-                        StoreFeature(
+                        _StoreFeature(
                           icon: Icons.storefront,
+
                           text: 'Your own store name and brand identity',
                         ),
 
-                        StoreFeature(
+                        _StoreFeature(
                           icon: Icons.inventory_2_outlined,
+
                           text: 'All your store products in one place',
                         ),
 
-                        StoreFeature(
+                        _StoreFeature(
                           icon: Icons.people_outline,
-                          text: 'Reach DIU student customers',
+
+                          text: 'Students can follow your store',
                         ),
 
-                        StoreFeature(
+                        _StoreFeature(
                           icon: Icons.dashboard_outlined,
+
                           text: 'Manage your products from Seller Dashboard',
                         ),
                       ],
@@ -717,10 +619,12 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                       child: isLoading
                           ? const SizedBox(
                               width: 23,
+
                               height: 23,
 
                               child: CircularProgressIndicator(
                                 color: Colors.white,
+
                                 strokeWidth: 2.5,
                               ),
                             )
@@ -737,6 +641,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
                                   style: TextStyle(
                                     fontSize: 16,
+
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -772,11 +677,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 // STORE FEATURE
 // ================================================================
 
-class StoreFeature extends StatelessWidget {
+class _StoreFeature extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const StoreFeature({super.key, required this.icon, required this.text});
+  const _StoreFeature({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -787,6 +692,7 @@ class StoreFeature extends StatelessWidget {
         children: [
           Container(
             width: 34,
+
             height: 34,
 
             decoration: BoxDecoration(

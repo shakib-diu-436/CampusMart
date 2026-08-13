@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'tuition_screen.dart';
 import 'services_screen.dart';
 import 'product_details_screen.dart';
+import 'store_screen.dart';
 
 const Color diuBlue = Color(0xFF034EA2);
 const Color diuGreen = Color(0xFF39B54A);
@@ -44,13 +45,24 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   // ============================================================
-  // PRODUCT STREAM
+  // PRODUCTS STREAM
   // ============================================================
 
   Stream<QuerySnapshot<Map<String, dynamic>>> getProductsStream() {
     return FirebaseFirestore.instance
         .collection('products')
         .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  // ============================================================
+  // STORES STREAM
+  // ============================================================
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> getStoresStream() {
+    return FirebaseFirestore.instance
+        .collection('stores')
+        .where('isActive', isEqualTo: true)
         .snapshots();
   }
 
@@ -93,7 +105,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   // ============================================================
-  // FILTER PRODUCTS
+  // PRODUCT FILTER
   // ============================================================
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> filterProducts(
@@ -108,21 +120,51 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
       final seller = data['sellerName']?.toString().toLowerCase() ?? '';
 
-      final category = data['category']?.toString() ?? '';
+      final category = data['category']?.toString().toLowerCase() ?? '';
 
-      // Category filter
-      if (selectedCategory != 'All' && category != selectedCategory) {
+      final description = data['description']?.toString().toLowerCase() ?? '';
+
+      if (selectedCategory != 'All' &&
+          category != selectedCategory.toLowerCase()) {
         return false;
       }
 
-      // Search filter
       if (search.isNotEmpty) {
         return name.contains(search) ||
             seller.contains(search) ||
-            category.toLowerCase().contains(search);
+            category.contains(search) ||
+            description.contains(search);
       }
 
       return true;
+    }).toList();
+  }
+
+  // ============================================================
+  // STORE FILTER
+  // ============================================================
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> filterStores(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final search = searchController.text.trim().toLowerCase();
+
+    if (search.isEmpty) {
+      return docs;
+    }
+
+    return docs.where((doc) {
+      final data = doc.data();
+
+      final storeName = data['storeName']?.toString().toLowerCase() ?? '';
+
+      final ownerName = data['ownerName']?.toString().toLowerCase() ?? '';
+
+      final description = data['description']?.toString().toLowerCase() ?? '';
+
+      return storeName.contains(search) ||
+          ownerName.contains(search) ||
+          description.contains(search);
     }).toList();
   }
 
@@ -180,10 +222,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
 
             children: [
-              // ==================================================
               // IMAGE
-              // ==================================================
-
               Expanded(
                 flex: 5,
 
@@ -231,7 +270,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                             ),
                     ),
 
-                    // Category badge
                     Positioned(
                       top: 9,
                       left: 9,
@@ -265,9 +303,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 ),
               ),
 
-              // ==================================================
-              // PRODUCT INFORMATION
-              // ==================================================
+              // INFO
               Expanded(
                 flex: 4,
 
@@ -349,6 +385,149 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   // ============================================================
+  // STORE CARD
+  // ============================================================
+
+  Widget storeCard(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final store = doc.data();
+
+    final storeId = doc.id;
+
+    final storeName = store['storeName']?.toString() ?? 'Unnamed Store';
+
+    final ownerName = store['ownerName']?.toString() ?? 'DIU Student';
+
+    final description = store['description']?.toString() ?? '';
+
+    final logoUrl = store['logoUrl']?.toString() ?? '';
+
+    final followerCount = store['followerCount'] ?? 0;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StoreScreen(
+              sellerId: store['ownerId']?.toString() ?? '',
+
+              storeId: storeId,
+            ),
+          ),
+        );
+      },
+
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+
+        padding: const EdgeInsets.all(15),
+
+        decoration: BoxDecoration(
+          color: Colors.white,
+
+          borderRadius: BorderRadius.circular(18),
+
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+
+        child: Row(
+          children: [
+            // =====================================================
+            // STORE LOGO
+            // =====================================================
+
+            StoreAvatar(
+              logoUrl: logoUrl,
+
+              ownerId: store['ownerId']?.toString() ?? '',
+            ),
+
+            const SizedBox(width: 13),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+
+                children: [
+                  Text(
+                    storeName,
+
+                    maxLines: 1,
+
+                    overflow: TextOverflow.ellipsis,
+
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+
+                      fontSize: 15,
+
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 3),
+
+                  Text(
+                    ownerName,
+
+                    maxLines: 1,
+
+                    overflow: TextOverflow.ellipsis,
+
+                    style: const TextStyle(color: diuGray, fontSize: 10),
+                  ),
+
+                  if (description.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+
+                    Text(
+                      description,
+
+                      maxLines: 1,
+
+                      overflow: TextOverflow.ellipsis,
+
+                      style: const TextStyle(color: diuGray, fontSize: 10),
+                    ),
+                  ],
+
+                  const SizedBox(height: 6),
+
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.people_outline,
+                        color: diuGray,
+
+                        size: 14,
+                      ),
+
+                      const SizedBox(width: 4),
+
+                      Text(
+                        '$followerCount followers',
+
+                        style: const TextStyle(color: diuGray, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const Icon(Icons.chevron_right_rounded, color: diuGray),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
   // BUILD
   // ============================================================
 
@@ -393,7 +572,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 },
 
                 decoration: InputDecoration(
-                  hintText: 'Search products, sellers...',
+                  hintText: selectedTab == 3
+                      ? 'Search stores...'
+                      : 'Search products, sellers...',
 
                   hintStyle: const TextStyle(
                     color: Color(0xFF9CA3AF),
@@ -456,23 +637,39 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 children: [
                   _marketTab(
                     index: 0,
+
                     icon: Icons.shopping_bag_outlined,
+
                     title: 'Products',
                   ),
 
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 7),
+
+                  _marketTab(
+                    index: 3,
+
+                    icon: Icons.storefront_outlined,
+
+                    title: 'Stores',
+                  ),
+
+                  const SizedBox(width: 7),
 
                   _marketTab(
                     index: 1,
+
                     icon: Icons.handyman_outlined,
+
                     title: 'Services',
                   ),
 
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 7),
 
                   _marketTab(
                     index: 2,
+
                     icon: Icons.school_outlined,
+
                     title: 'Tuition',
                   ),
                 ],
@@ -487,7 +684,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   ? _productsTab()
                   : selectedTab == 1
                   ? _servicesTab()
-                  : _tuitionTab(),
+                  : selectedTab == 2
+                  ? _tuitionTab()
+                  : _storesTab(),
             ),
           ],
         ),
@@ -511,6 +710,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         onTap: () {
           setState(() {
             selectedTab = index;
+
+            searchController.clear();
+
+            selectedCategory = 'All';
           });
         },
 
@@ -533,19 +736,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
 
             children: [
-              Icon(icon, size: 17, color: selected ? Colors.white : diuBlue),
+              Icon(icon, size: 16, color: selected ? Colors.white : diuBlue),
 
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
 
-              Text(
-                title,
+              Flexible(
+                child: Text(
+                  title,
 
-                style: TextStyle(
-                  color: selected ? Colors.white : const Color(0xFF111827),
+                  overflow: TextOverflow.ellipsis,
 
-                  fontSize: 10,
+                  style: TextStyle(
+                    color: selected ? Colors.white : const Color(0xFF111827),
 
-                  fontWeight: FontWeight.bold,
+                    fontSize: 9,
+
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -578,10 +785,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
         return Column(
           children: [
-            // ==================================================
             // CATEGORIES
-            // ==================================================
-
             SizedBox(
               height: 52,
 
@@ -658,9 +862,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ),
             ),
 
-            // ==================================================
-            // PRODUCT GRID
-            // ==================================================
             Expanded(
               child: filtered.isEmpty
                   ? _emptyProducts()
@@ -692,6 +893,75 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   // ============================================================
+  // STORES
+  // ============================================================
+
+  Widget _storesTab() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: getStoresStream(),
+
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: diuBlue));
+        }
+
+        if (snapshot.hasError) {
+          return _errorState(snapshot.error.toString());
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        final filtered = filterStores(docs);
+
+        if (filtered.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+
+              children: [
+                const Icon(Icons.storefront_outlined, color: diuGray, size: 55),
+
+                const SizedBox(height: 12),
+
+                Text(
+                  searchController.text.trim().isEmpty
+                      ? 'No stores available'
+                      : 'No stores found',
+
+                  style: const TextStyle(
+                    color: Color(0xFF111827),
+
+                    fontSize: 17,
+
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 5),
+
+                const Text(
+                  'Try another store name.',
+                  style: TextStyle(color: diuGray, fontSize: 11),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 25),
+
+          itemCount: filtered.length,
+
+          itemBuilder: (context, index) {
+            return storeCard(context, filtered[index]);
+          },
+        );
+      },
+    );
+  }
+
+  // ============================================================
   // SERVICES
   // ============================================================
 
@@ -708,107 +978,20 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   // ============================================================
-  // COMING SOON
-  // ============================================================
-
-  Widget _comingSoonMarket({
-    required IconData icon,
-    required String title,
-    required String description,
-    required String buttonText,
-  }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30),
-
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-
-          children: [
-            Container(
-              width: 90,
-
-              height: 90,
-
-              decoration: BoxDecoration(
-                color: diuBlue.withOpacity(.08),
-
-                shape: BoxShape.circle,
-              ),
-
-              child: Icon(icon, color: diuBlue, size: 43),
-            ),
-
-            const SizedBox(height: 18),
-
-            Text(
-              title,
-
-              textAlign: TextAlign.center,
-
-              style: const TextStyle(
-                color: Color(0xFF111827),
-
-                fontSize: 19,
-
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            Text(
-              description,
-
-              textAlign: TextAlign.center,
-
-              style: const TextStyle(color: diuGray, fontSize: 12, height: 1.5),
-            ),
-
-            const SizedBox(height: 18),
-
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAF2FB),
-
-                borderRadius: BorderRadius.circular(20),
-              ),
-
-              child: const Text(
-                'Coming Next',
-
-                style: TextStyle(
-                  color: diuBlue,
-
-                  fontSize: 11,
-
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // EMPTY PRODUCTS
+  // EMPTY
   // ============================================================
 
   Widget _emptyProducts() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
 
         children: [
-          const Icon(Icons.search_off_rounded, color: diuGray, size: 55),
+          Icon(Icons.search_off_rounded, color: diuGray, size: 55),
 
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
 
-          const Text(
+          Text(
             'No products found',
 
             style: TextStyle(
@@ -820,9 +1003,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             ),
           ),
 
-          const SizedBox(height: 5),
+          SizedBox(height: 5),
 
-          const Text(
+          Text(
             'Try another search or category.',
 
             style: TextStyle(color: diuGray, fontSize: 11),
@@ -847,9 +1030,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           children: [
             const Icon(
               Icons.error_outline_rounded,
-
               color: Colors.red,
-
               size: 50,
             ),
 
@@ -879,6 +1060,91 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// =================================================================
+// STORE AVATAR
+// =================================================================
+
+class StoreAvatar extends StatelessWidget {
+  final String logoUrl;
+  final String ownerId;
+
+  const StoreAvatar({super.key, required this.logoUrl, required this.ownerId});
+
+  @override
+  Widget build(BuildContext context) {
+    if (logoUrl.trim().isNotEmpty) {
+      return _networkAvatar(logoUrl);
+    }
+
+    if (ownerId.trim().isEmpty) {
+      return _defaultAvatar();
+    }
+
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: FirebaseFirestore.instance.collection('users').doc(ownerId).get(),
+
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+
+        final photoUrl =
+            data?['photoURL']?.toString() ??
+            data?['profileImage']?.toString() ??
+            '';
+
+        if (photoUrl.trim().isNotEmpty) {
+          return _networkAvatar(photoUrl);
+        }
+
+        return _defaultAvatar();
+      },
+    );
+  }
+
+  Widget _networkAvatar(String url) {
+    return Container(
+      width: 62,
+
+      height: 62,
+
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF2FB),
+
+        shape: BoxShape.circle,
+
+        border: Border.all(color: const Color(0xFFD7E5F5)),
+      ),
+
+      child: ClipOval(
+        child: Image.network(
+          url,
+
+          fit: BoxFit.cover,
+
+          errorBuilder: (context, error, stackTrace) {
+            return _defaultAvatar();
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      width: 62,
+
+      height: 62,
+
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF2FB),
+
+        shape: BoxShape.circle,
+      ),
+
+      child: const Icon(Icons.storefront_rounded, color: diuBlue, size: 30),
     );
   }
 }

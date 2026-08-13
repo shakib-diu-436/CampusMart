@@ -37,6 +37,7 @@ class CampusMartApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+
       title: 'CampusMart DIU',
 
       theme: ThemeData(
@@ -49,6 +50,14 @@ class CampusMartApp extends StatelessWidget {
         fontFamily: 'Arial',
       ),
 
+      // ==========================================================
+      // ROUTES
+      // ==========================================================
+      routes: {'/login': (_) => const LoginScreen()},
+
+      // ==========================================================
+      // INITIAL SCREEN
+      // ==========================================================
       home: const LoginScreen(),
     );
   }

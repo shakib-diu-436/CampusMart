@@ -35,9 +35,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream() {
     final user = currentUser;
 
+    if (user == null) {
+      return const Stream.empty();
+    }
+
     return FirebaseFirestore.instance
         .collection('users')
-        .doc(user!.uid)
+        .doc(user.uid)
         .snapshots();
   }
 
@@ -48,6 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> logout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
+
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,
@@ -58,14 +63,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           title: const Text(
             'Logout?',
+
             style: TextStyle(
               color: Color(0xFF111827),
+
               fontWeight: FontWeight.bold,
             ),
           ),
 
           content: const Text(
             'Are you sure you want to logout from CampusMart?',
+
             style: TextStyle(color: diuGray, fontSize: 13, height: 1.5),
           ),
 
@@ -74,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: () {
                 Navigator.pop(context, false);
               },
+
               child: const Text('Cancel', style: TextStyle(color: diuGray)),
             ),
 
@@ -84,7 +93,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
+
                 foregroundColor: Colors.white,
+
                 elevation: 0,
 
                 shape: RoundedRectangleBorder(
@@ -104,12 +115,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     // ==========================================================
-    // SIGN OUT
+    // SIGN OUT FROM FIREBASE
     // ==========================================================
 
-    await FirebaseAuth.instance.signOut();
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
 
-    if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logout failed: $e'),
+
+          backgroundColor: Colors.red,
+
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     // ==========================================================
     // GO TO LOGIN
@@ -133,6 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final result = await showDialog<bool>(
       context: context,
+
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,
@@ -143,8 +175,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           title: const Text(
             'Edit Profile',
+
             style: TextStyle(
               color: Color(0xFF111827),
+
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -218,7 +252,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       .doc(user.uid)
                       .set({
                         'name': name,
+
                         'phone': phone,
+
                         'updatedAt': FieldValue.serverTimestamp(),
                       }, SetOptions(merge: true));
 
@@ -233,7 +269,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Profile updated successfully.'),
+
                       backgroundColor: diuGreen,
+
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -245,7 +283,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Could not update profile: $e'),
+
                       backgroundColor: Colors.red,
+
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -254,7 +294,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               style: ElevatedButton.styleFrom(
                 backgroundColor: diuBlue,
+
                 foregroundColor: Colors.white,
+
                 elevation: 0,
 
                 shape: RoundedRectangleBorder(
@@ -308,7 +350,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         style: const TextStyle(
           color: Color(0xFF111827),
+
           fontSize: 15,
+
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -348,6 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             Container(
               width: 46,
+
               height: 46,
 
               decoration: BoxDecoration(
@@ -371,7 +416,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     style: const TextStyle(
                       color: Color(0xFF111827),
+
                       fontSize: 14,
+
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -389,7 +436,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const Icon(
               Icons.arrow_forward_ios_rounded,
+
               color: diuGray,
+
               size: 15,
             ),
           ],
@@ -425,7 +474,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           style: TextStyle(
             color: Color(0xFF111827),
+
             fontSize: 19,
+
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -483,6 +534,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Container(
                           width: 70,
+
                           height: 70,
 
                           decoration: BoxDecoration(
@@ -493,7 +545,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                           child: const Icon(
                             Icons.person_rounded,
+
                             color: diuBlue,
+
                             size: 40,
                           ),
                         ),
@@ -514,7 +568,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                                 style: const TextStyle(
                                   color: Color(0xFF111827),
+
                                   fontSize: 19,
+
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -530,6 +586,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                                 style: const TextStyle(
                                   color: diuGray,
+
                                   fontSize: 11,
                                 ),
                               ),
@@ -542,6 +599,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                                   style: const TextStyle(
                                     color: diuGray,
+
                                     fontSize: 11,
                                   ),
                                 ),
@@ -557,7 +615,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                           icon: const Icon(
                             Icons.edit_outlined,
+
                             color: diuBlue,
+
                             size: 21,
                           ),
                         ),
@@ -589,6 +649,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
+
                         MaterialPageRoute(
                           builder: (_) => const MyOrdersScreen(),
                         ),
@@ -614,6 +675,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
+
                           MaterialPageRoute(
                             builder: (_) => const SellerOrdersScreen(),
                           ),
@@ -658,6 +720,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
+
                         MaterialPageRoute(
                           builder: (_) => const MyServicesScreen(),
                         ),
@@ -682,6 +745,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
+
                         MaterialPageRoute(
                           builder: (_) => const MyTuitionScreen(),
                         ),
@@ -754,6 +818,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Container(
                             width: 48,
+
                             height: 48,
 
                             decoration: BoxDecoration(
@@ -764,7 +829,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                             child: const Icon(
                               Icons.storefront_rounded,
+
                               color: diuGreen,
+
                               size: 26,
                             ),
                           ),
@@ -781,7 +848,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                                   style: TextStyle(
                                     color: Color(0xFF111827),
+
                                     fontSize: 14,
+
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -793,6 +862,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                                   style: TextStyle(
                                     color: diuGray,
+
                                     fontSize: 10,
                                   ),
                                 ),
@@ -804,6 +874,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onPressed: () async {
                               await Navigator.push(
                                 context,
+
                                 MaterialPageRoute(
                                   builder: (_) => const BecomeSellerScreen(),
                                 ),
@@ -812,7 +883,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                             icon: const Icon(
                               Icons.arrow_forward_ios_rounded,
+
                               color: diuGreen,
+
                               size: 17,
                             ),
                           ),
