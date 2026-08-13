@@ -68,9 +68,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
   String convertImageUrl(String url) {
     url = url.trim();
 
-    // Google Drive:
-    // https://drive.google.com/file/d/FILE_ID/view?usp=sharing
-
     final driveRegex = RegExp(r'drive\.google\.com\/file\/d\/([^\/]+)');
 
     final match = driveRegex.firstMatch(url);
@@ -81,7 +78,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return 'https://drive.google.com/uc?export=view&id=$fileId';
     }
 
-    // Already a direct image URL
     return url;
   }
 
@@ -106,10 +102,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
 
     try {
-      // Convert Google Drive URL automatically
+      // --------------------------------------------------------
+      // IMAGE URL
+      // --------------------------------------------------------
+
       final imageUrl = convertImageUrl(imageUrlController.text);
 
-      // Get seller information
+      // --------------------------------------------------------
+      // GET USER INFORMATION
+      // --------------------------------------------------------
+
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -120,11 +122,43 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final sellerName =
           userData?['name'] ?? user.displayName ?? 'CampusMart Seller';
 
-      // Create product
+      // --------------------------------------------------------
+      // GET STORE INFORMATION
+      // --------------------------------------------------------
+
+      final storeId = userData?['storeId'];
+
+      final hasStore = storeId != null && storeId.toString().trim().isNotEmpty;
+
+      // --------------------------------------------------------
+      // SELLER TYPE
+      // --------------------------------------------------------
+
+      final sellerType = hasStore ? 'business' : 'individual';
+
+      // --------------------------------------------------------
+      // CREATE PRODUCT
+      // --------------------------------------------------------
+
       await FirebaseFirestore.instance.collection('products').add({
+        // ======================================================
+        // SELLER INFORMATION
+        // ======================================================
+
         'sellerId': user.uid,
+
         'sellerName': sellerName,
 
+        'sellerType': sellerType,
+
+        // ======================================================
+        // STORE INFORMATION
+        // ======================================================
+        'storeId': hasStore ? storeId : null,
+
+        // ======================================================
+        // PRODUCT INFORMATION
+        // ======================================================
         'name': nameController.text.trim(),
 
         'description': descriptionController.text.trim(),
@@ -137,14 +171,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
         'imageUrl': imageUrl,
 
+        // ======================================================
+        // RATING
+        // ======================================================
         'rating': 0.0,
 
         'reviewCount': 0,
 
-        'createdAt': FieldValue.serverTimestamp(),
-
+        // ======================================================
+        // STATUS
+        // ======================================================
         'isAvailable': true,
+
+        // ======================================================
+        // TIMESTAMP
+        // ======================================================
+        'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // --------------------------------------------------------
+      // SUCCESS
+      // --------------------------------------------------------
 
       if (!mounted) return;
 
@@ -152,7 +199,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
         isPublishing = false;
       });
 
-      showMessage('Product published successfully! 🎉', diuGreen);
+      showMessage(
+        hasStore
+            ? 'Product added to your store successfully! 🎉'
+            : 'Product published successfully! 🎉',
+        diuGreen,
+      );
 
       await Future.delayed(const Duration(milliseconds: 800));
 
@@ -177,6 +229,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // ============================================================
 
   void showMessage(String message, Color color) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -197,6 +251,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       appBar: AppBar(
         backgroundColor: Colors.white,
+
         elevation: 0,
 
         leading: IconButton(
@@ -248,6 +303,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
                     Container(
                       width: double.infinity,
+
                       height: 210,
 
                       decoration: BoxDecoration(
@@ -320,7 +376,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
                     const SizedBox(height: 12),
 
+                    // =================================================
                     // IMAGE URL
+                    // =================================================
                     TextFormField(
                       controller: imageUrlController,
 
@@ -349,13 +407,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
                     const Text(
                       'Google Drive: set the image access to “Anyone with the link”.',
+
                       style: TextStyle(color: diuGray, fontSize: 11),
                     ),
 
                     const SizedBox(height: 25),
 
                     // =================================================
-                    // PRODUCT NAME
+                    // PRODUCT INFORMATION
                     // =================================================
                     const Text(
                       'Product Information',
@@ -368,6 +427,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
                     const SizedBox(height: 12),
 
+                    // PRODUCT NAME
                     TextFormField(
                       controller: nameController,
 
@@ -401,7 +461,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ),
 
                       items: categories.map((category) {
-                        return DropdownMenuItem(
+                        return DropdownMenuItem<String>(
                           value: category,
                           child: Text(category),
                         );
@@ -513,6 +573,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     // =================================================
                     SizedBox(
                       width: double.infinity,
+
                       height: 55,
 
                       child: ElevatedButton(
@@ -552,6 +613,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
                                   Text(
                                     'Publish Product',
+
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -589,6 +651,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       prefixIcon: Icon(icon, color: diuGray),
 
       filled: true,
+
       fillColor: Colors.white,
 
       border: OutlineInputBorder(
