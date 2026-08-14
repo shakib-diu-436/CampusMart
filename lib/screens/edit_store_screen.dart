@@ -81,23 +81,20 @@ class _EditStoreScreenState extends State<EditStoreScreen> {
     setState(() => isUpdating = true);
 
     try {
-      await FirebaseFirestore.instance
-          .collection('stores')
-          .doc(widget.storeId)
-          .update({
-            'storeName': storeName,
-            'description': description,
-            'logoUrl': logoUrl,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      final firestore = FirebaseFirestore.instance;
+      await firestore.collection('stores').doc(widget.storeId).update({
+        'storeName': storeName,
+        'description': description,
+        'logoUrl': logoUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-      // Also update the user's storeName field if needed
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({'storeName': storeName});
+        await firestore.collection('users').doc(user.uid).set({
+          'storeName': storeName,
+          'storeId': widget.storeId,
+        }, SetOptions(merge: true));
       }
 
       if (!mounted) return;

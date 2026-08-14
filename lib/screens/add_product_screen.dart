@@ -85,13 +85,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
+    final firestore = FirebaseFirestore.instance;
+
     // ===== CHECK IF USER HAS A STORE =====
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
+    String? storeId;
+    final userDoc = await firestore.collection('users').doc(user.uid).get();
     final userData = userDoc.data();
-    final storeId = userData?['storeId']?.toString();
+    storeId = userData?['storeId']?.toString();
+
+    if (storeId == null || storeId.trim().isEmpty) {
+      final storeQuery = await firestore
+          .collection('stores')
+          .where('ownerId', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (storeQuery.docs.isNotEmpty) {
+        storeId = storeQuery.docs.first.id;
+        await firestore.collection('users').doc(user.uid).set({
+          'storeId': storeId,
+          'isSeller': true,
+        }, SetOptions(merge: true));
+      }
+    }
 
     if (storeId == null || storeId.trim().isEmpty) {
       showMessage(
@@ -114,17 +130,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     try {
       final imageUrl = convertImageUrl(imageUrlController.text);
 
-      final userDoc2 = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final userDoc2 = await firestore.collection('users').doc(user.uid).get();
       final userData2 = userDoc2.data();
       final sellerName =
           userData2?['name'] ?? user.displayName ?? 'CampusMart Seller';
-      final storeId2 = userData2?['storeId']?.toString() ?? '';
+      final storeId2 = storeId;
       final hasStore = storeId2.isNotEmpty;
 
-      await FirebaseFirestore.instance.collection('products').add({
+      await firestore.collection('products').add({
         'sellerId': user.uid,
         'sellerName': sellerName,
         'sellerType': hasStore ? 'business' : 'individual',
