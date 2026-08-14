@@ -8,6 +8,7 @@ import 'profile_screen.dart';
 import 'become_seller_screen.dart';
 import 'product_details_screen.dart';
 import 'student_listing_screen.dart';
+import 'main_navigation_screen.dart';
 
 const Color diuBlue = Color(0xFF034EA2);
 const Color diuGreen = Color(0xFF39B54A);
@@ -215,6 +216,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             onPressed: () {
+              final navState = context
+                  .findAncestorStateOfType<MainNavigationScreenState>();
+              if (navState != null) {
+                navState.selectTab(3);
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const CartScreen()),

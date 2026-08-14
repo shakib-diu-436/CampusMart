@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'checkout_screen.dart';
+import 'main_navigation_screen.dart';
 
 const Color diuBlue = Color(0xFF034EA2);
 const Color diuGreen = Color(0xFF39B54A);
@@ -628,7 +629,17 @@ class CartScreen extends StatelessWidget {
             const SizedBox(height: 22),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pop(context);
+                final navState = context
+                    .findAncestorStateOfType<MainNavigationScreenState>();
+                if (navState != null) {
+                  navState.selectTab(0);
+                  return;
+                }
+
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                  return;
+                }
               },
               icon: const Icon(Icons.storefront_rounded, size: 18),
               label: const Text('Continue Shopping'),

@@ -15,10 +15,10 @@ class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  State<MainNavigationScreen> createState() => MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
@@ -29,6 +29,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   ];
 
   late final List<Widget> _tabs;
+
+  void selectTab(int index) {
+    if (index < 0 || index >= _tabs.length) return;
+
+    if (_selectedIndex == index) {
+      _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+    } else {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -50,21 +62,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
         final navigator = _navigatorKeys[index].currentState;
         if (navigator != null && navigator.canPop()) {
-          // If there is a nested route, pop it
           navigator.pop();
           return;
         }
 
-        // At root of the current tab
         if (index != 0) {
-          // Switch to Home tab
-          setState(() {
-            _selectedIndex = 0;
-          });
+          selectTab(0);
           return;
         }
 
-        // On Home tab, ask for confirmation before exiting
         final shouldExit = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -105,14 +111,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         );
 
         if (shouldExit == true) {
-          // Exit the app (works on Android and iOS)
           SystemNavigator.pop();
         }
       },
       child: Navigator(
         key: _navigatorKeys[index],
         onGenerateRoute: (settings) {
-          // Default route: return the screen
           return MaterialPageRoute(builder: (_) => screen);
         },
       ),
@@ -120,14 +124,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _onTabTapped(int index) {
-    // If already on the same tab, pop to root of that tab
-    if (_selectedIndex == index) {
-      _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
-    } else {
-      setState(() {
-        _selectedIndex = index;
-      });
-    }
+    selectTab(index);
   }
 
   @override
