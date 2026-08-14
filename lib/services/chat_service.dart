@@ -32,6 +32,7 @@ class ChatService {
   Future<void> sendMessage({
     required String chatId,
     required String senderId,
+    required String receiverId,
     required String senderName,
     required String text,
     String? productId,
@@ -40,7 +41,7 @@ class ChatService {
   }) async {
     final chatRef = _firestore.collection('chats').doc(chatId);
     await chatRef.set({
-      'participants': FieldValue.arrayUnion([senderId]),
+      'participants': FieldValue.arrayUnion([senderId, receiverId]),
       'lastMessage': text,
       'lastMessageTime': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),

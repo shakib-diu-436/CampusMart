@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../services/user_service.dart';
 import 'marketplace_screen.dart';
 import 'cart_screen.dart';
 import 'profile_screen.dart';
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final TextEditingController searchController;
   String searchQuery = '';
   String? selectedCategory;
+  String _displayName = 'Student';
 
   final List<String> categories = [
     'Plants',
@@ -56,7 +58,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _displayName = widget.userName;
     searchController = TextEditingController();
+    _loadCurrentUserName();
+  }
+
+  Future<void> _loadCurrentUserName() async {
+    final name = await UserService().getCurrentUserName();
+    if (!mounted) return;
+    setState(() {
+      _displayName = name;
+    });
   }
 
   @override
@@ -248,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Hello, ${widget.userName}! 👋',
+                        'Hello, $_displayName! 👋',
                         style: const TextStyle(
                           color: Color(0xFF111827),
                           fontSize: 25,

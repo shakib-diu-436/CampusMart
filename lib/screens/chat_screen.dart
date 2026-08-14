@@ -71,11 +71,12 @@ class _ChatScreenState extends State<ChatScreen> {
       await _chatService.sendMessage(
         chatId: _chatId,
         senderId: user.uid,
+        receiverId: widget.otherUserId,
         senderName: userName,
         text: text,
         productId: widget.productId,
         productTitle: widget.productTitle,
-        type: widget.type, // <-- পাঠাচ্ছি
+        type: widget.type,
       );
       _messageController.clear();
       _scrollToBottom();

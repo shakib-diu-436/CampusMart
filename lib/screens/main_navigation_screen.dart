@@ -55,9 +55,11 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Widget _buildNavigator(int index, Widget screen) {
+    final isHomeTab = index == 0;
+
     return PopScope(
-      canPop: false,
-      onPopInvoked: (bool didPop) async {
+      canPop: !isHomeTab,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
         if (didPop) return;
 
         final navigator = _navigatorKeys[index].currentState;
@@ -66,7 +68,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
           return;
         }
 
-        if (index != 0) {
+        if (!isHomeTab) {
           selectTab(0);
           return;
         }

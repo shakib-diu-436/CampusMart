@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'add_product_screen.dart';
 import 'edit_product_screen.dart';
 
 const Color diuBlue = Color(0xFF034EA2);
@@ -369,7 +370,10 @@ class MyProductsScreen extends StatelessWidget {
 
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddProductScreen()),
+                );
               },
 
               icon: const Icon(Icons.add),
