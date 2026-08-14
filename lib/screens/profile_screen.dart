@@ -10,6 +10,8 @@ import 'become_seller_screen.dart';
 import 'my_products_screen.dart';
 import 'my_student_listings_screen.dart';
 import 'chat_list_screen.dart';
+import 'wishlist_screen.dart';
+import 'delivery_address_screen.dart';
 
 const Color diuBlue = Color(0xFF034EA2);
 const Color diuGreen = Color(0xFF39B54A);
@@ -532,24 +534,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
 
-                  // Wishlist (coming soon)
+                  // Wishlist
                   const SizedBox(height: 10),
                   _menuCard(
                     icon: Icons.favorite_border_rounded,
                     title: 'Wishlist',
                     subtitle: 'Products you saved',
                     color: Colors.pink,
-                    onTap: () => _showComingSoon(context, 'Wishlist'),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WishlistScreen(),
+                        ),
+                      );
+                    },
                   ),
 
-                  // Delivery Addresses (coming soon)
+                  // Delivery Addresses
                   const SizedBox(height: 10),
                   _menuCard(
                     icon: Icons.location_on_outlined,
                     title: 'Delivery Addresses',
                     subtitle: 'Manage your delivery locations',
                     color: diuBlue,
-                    onTap: () => _showComingSoon(context, 'Delivery Addresses'),
+                    onTap: () async {
+                      final address = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DeliveryAddressScreen(),
+                        ),
+                      );
+                      if (address != null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Selected address: $address'),
+                            backgroundColor: diuGreen,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
                   ),
 
                   const SizedBox(height: 18),

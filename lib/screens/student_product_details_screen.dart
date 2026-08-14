@@ -29,6 +29,82 @@ class StudentProductDetailsScreen extends StatefulWidget {
 class _StudentProductDetailsScreenState
     extends State<StudentProductDetailsScreen> {
   bool isBuying = false;
+  bool isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteStatus();
+  }
+
+  Future<void> _loadFavoriteStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('wishlist')
+        .doc(widget.productId)
+        .get();
+
+    if (!mounted) return;
+    setState(() {
+      isFavorite = doc.exists;
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login first.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final wishlistRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('wishlist')
+        .doc(widget.productId);
+
+    if (isFavorite) {
+      await wishlistRef.delete();
+      if (!mounted) return;
+      setState(() => isFavorite = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Removed from wishlist.'),
+          backgroundColor: diuBlue,
+        ),
+      );
+      return;
+    }
+
+    await wishlistRef.set({
+      'productId': widget.productId,
+      'name': widget.productData['title'] ?? 'Untitled',
+      'price': widget.productData['price'] ?? 0,
+      'imageUrl': widget.productData['imageUrl'] ?? '',
+      'sellerName': widget.productData['studentName'] ?? 'DIU Student',
+      'category': widget.productData['category'] ?? 'Other',
+      'productType': 'student',
+      'savedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    setState(() => isFavorite = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Added to wishlist.'),
+        backgroundColor: diuGreen,
+      ),
+    );
+  }
 
   Future<void> _buyNow() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -222,8 +298,13 @@ class _StudentProductDetailsScreenState
         ),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.favorite_border_rounded, color: diuGray),
+            onPressed: _toggleFavorite,
+            icon: Icon(
+              isFavorite
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              color: isFavorite ? Colors.red : diuGray,
+            ),
           ),
         ],
       ),

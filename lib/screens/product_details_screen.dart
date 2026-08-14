@@ -20,11 +20,76 @@ class ProductDetailsScreen extends StatefulWidget {
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   String storeName = '';
   bool isLoadingStore = true;
+  bool isFavorite = false;
 
   @override
   void initState() {
     super.initState();
     _loadStoreName();
+    _loadFavoriteStatus();
+  }
+
+  Future<void> _loadFavoriteStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final productId = widget.product['productId']?.toString() ?? '';
+    if (productId.isEmpty) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('wishlist')
+        .doc(productId)
+        .get();
+
+    if (!mounted) return;
+    setState(() {
+      isFavorite = doc.exists;
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showMessage(context, 'Please login first.', error: true);
+      return;
+    }
+
+    final productId = widget.product['productId']?.toString() ?? '';
+    if (productId.isEmpty) {
+      _showMessage(context, 'Product ID not found.', error: true);
+      return;
+    }
+
+    final wishlistRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('wishlist')
+        .doc(productId);
+
+    if (isFavorite) {
+      await wishlistRef.delete();
+      if (!mounted) return;
+      setState(() => isFavorite = false);
+      _showMessage(context, 'Removed from wishlist.');
+      return;
+    }
+
+    await wishlistRef.set({
+      'productId': productId,
+      'name': widget.product['name'] ?? 'Unnamed Product',
+      'price': widget.product['price'] ?? 0,
+      'imageUrl': widget.product['imageUrl'] ?? '',
+      'sellerName': widget.product['sellerName'] ?? 'CampusMart Seller',
+      'category': widget.product['category'] ?? 'Other',
+      'productType': 'store',
+      'savedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    setState(() => isFavorite = true);
+    _showMessage(context, 'Added to wishlist.');
   }
 
   Future<void> _loadStoreName() async {
@@ -216,9 +281,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () =>
-                _showMessage(context, 'Favorite feature coming soon.'),
-            icon: const Icon(Icons.favorite_border_rounded, color: diuGray),
+            onPressed: _toggleFavorite,
+            icon: Icon(
+              isFavorite
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              color: isFavorite ? Colors.red : diuGray,
+            ),
           ),
         ],
       ),

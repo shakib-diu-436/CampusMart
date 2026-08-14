@@ -27,6 +27,7 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final TextEditingController nameController = TextEditingController();
 
@@ -37,8 +38,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController noteController = TextEditingController();
 
   bool isPlacingOrder = false;
+  bool isLoadingProfile = true;
 
   String selectedPayment = 'bkash';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedProfileInfo();
+  }
+
+  Future<void> _loadSavedProfileInfo() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => isLoadingProfile = false);
+      return;
+    }
+
+    try {
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      final data = doc.data() ?? {};
+      final savedName = data['name']?.toString() ?? user.displayName ?? '';
+      final savedPhone = data['phone']?.toString() ?? '';
+      final savedAddress =
+          data['defaultAddress']?.toString() ??
+          data['address']?.toString() ??
+          '';
+
+      if (!mounted) return;
+      setState(() {
+        nameController.text = savedName;
+        phoneController.text = savedPhone;
+        addressController.text = savedAddress;
+        isLoadingProfile = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => isLoadingProfile = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -397,378 +435,387 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // ==========================================================
       // BODY
       // ==========================================================
-      body: Form(
-        key: _formKey,
+      body: isLoadingProfile
+          ? const Center(child: CircularProgressIndicator(color: diuBlue))
+          : Form(
+              key: _formKey,
 
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-              // ====================================================
-              // DELIVERY INFORMATION
-              // ====================================================
-
-              _sectionTitle('Delivery Information', Icons.location_on_outlined),
-
-              const SizedBox(height: 12),
-
-              Container(
-                width: double.infinity,
-
-                padding: const EdgeInsets.all(16),
-
-                decoration: BoxDecoration(
-                  color: Colors.white,
-
-                  borderRadius: BorderRadius.circular(16),
-
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
 
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+
                   children: [
-                    _textField(
-                      controller: nameController,
+                    // ====================================================
+                    // DELIVERY INFORMATION
+                    // ====================================================
 
-                      label: 'Full Name',
-
-                      hint: 'Enter your full name',
-
-                      icon: Icons.person_outline_rounded,
-
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your name';
-                        }
-
-                        return null;
-                      },
+                    _sectionTitle(
+                      'Delivery Information',
+                      Icons.location_on_outlined,
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
-                    _textField(
-                      controller: phoneController,
+                    Container(
+                      width: double.infinity,
 
-                      label: 'Phone Number',
+                      padding: const EdgeInsets.all(16),
 
-                      hint: '01XXXXXXXXX',
+                      decoration: BoxDecoration(
+                        color: Colors.white,
 
-                      icon: Icons.phone_outlined,
+                        borderRadius: BorderRadius.circular(16),
 
-                      keyboardType: TextInputType.phone,
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
 
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your phone number';
-                        }
+                      child: Column(
+                        children: [
+                          _textField(
+                            controller: nameController,
 
-                        if (value.trim().length < 11) {
-                          return 'Enter a valid phone number';
-                        }
+                            label: 'Full Name',
 
-                        return null;
-                      },
-                    ),
+                            hint: 'Enter your full name',
 
-                    const SizedBox(height: 14),
+                            icon: Icons.person_outline_rounded,
 
-                    _textField(
-                      controller: addressController,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your name';
+                              }
 
-                      label: 'Delivery Address',
+                              return null;
+                            },
+                          ),
 
-                      hint: 'Enter your delivery location',
+                          const SizedBox(height: 14),
 
-                      icon: Icons.location_on_outlined,
+                          _textField(
+                            controller: phoneController,
 
-                      maxLines: 3,
+                            label: 'Phone Number',
 
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your delivery address';
-                        }
+                            hint: '01XXXXXXXXX',
 
-                        return null;
-                      },
-                    ),
+                            icon: Icons.phone_outlined,
 
-                    const SizedBox(height: 14),
+                            keyboardType: TextInputType.phone,
 
-                    _textField(
-                      controller: noteController,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your phone number';
+                              }
 
-                      label: 'Additional Note (Optional)',
+                              if (value.trim().length < 11) {
+                                return 'Enter a valid phone number';
+                              }
 
-                      hint: 'Any special instruction?',
+                              return null;
+                            },
+                          ),
 
-                      icon: Icons.notes_outlined,
+                          const SizedBox(height: 14),
 
-                      maxLines: 3,
-                    ),
-                  ],
-                ),
-              ),
+                          _textField(
+                            controller: addressController,
 
-              const SizedBox(height: 20),
+                            label: 'Delivery Address',
 
-              // ====================================================
-              // PAYMENT
-              // ====================================================
-              _sectionTitle('Payment Method', Icons.payment_outlined),
+                            hint: 'Enter your delivery location',
 
-              const SizedBox(height: 12),
+                            icon: Icons.location_on_outlined,
 
-              Container(
-                width: double.infinity,
+                            maxLines: 3,
 
-                padding: const EdgeInsets.all(14),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your delivery address';
+                              }
 
-                decoration: BoxDecoration(
-                  color: Colors.white,
+                              return null;
+                            },
+                          ),
 
-                  borderRadius: BorderRadius.circular(16),
+                          const SizedBox(height: 14),
 
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
+                          _textField(
+                            controller: noteController,
 
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      selectedPayment = 'bkash';
-                    });
-                  },
+                            label: 'Additional Note (Optional)',
 
-                  borderRadius: BorderRadius.circular(12),
+                            hint: 'Any special instruction?',
 
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
+                            icon: Icons.notes_outlined,
 
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFE9F0),
-
-                      borderRadius: BorderRadius.circular(12),
-
-                      border: Border.all(
-                        color: const Color(0xFFE2136E),
-
-                        width: 1.5,
+                            maxLines: 3,
+                          ),
+                        ],
                       ),
                     ),
 
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
+                    const SizedBox(height: 20),
+
+                    // ====================================================
+                    // PAYMENT
+                    // ====================================================
+                    _sectionTitle('Payment Method', Icons.payment_outlined),
+
+                    const SizedBox(height: 12),
+
+                    Container(
+                      width: double.infinity,
+
+                      padding: const EdgeInsets.all(14),
+
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+
+                        borderRadius: BorderRadius.circular(16),
+
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            selectedPayment = 'bkash';
+                          });
+                        },
+
+                        borderRadius: BorderRadius.circular(12),
+
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
 
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE2136E),
+                            color: const Color(0xFFFFE9F0),
 
                             borderRadius: BorderRadius.circular(12),
-                          ),
 
-                          child: const Center(
-                            child: Text(
-                              'bKash',
+                            border: Border.all(
+                              color: const Color(0xFFE2136E),
 
-                              style: TextStyle(
-                                color: Colors.white,
-
-                                fontSize: 12,
-
-                                fontWeight: FontWeight.bold,
-                              ),
+                              width: 1.5,
                             ),
                           ),
-                        ),
 
-                        const SizedBox(width: 12),
-
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-
+                          child: Row(
                             children: [
-                              Text(
-                                'bKash',
+                              Container(
+                                width: 48,
+                                height: 48,
 
-                                style: TextStyle(
-                                  color: Color(0xFF111827),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE2136E),
 
-                                  fontSize: 14,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
 
-                                  fontWeight: FontWeight.bold,
+                                child: const Center(
+                                  child: Text(
+                                    'bKash',
+
+                                    style: TextStyle(
+                                      color: Colors.white,
+
+                                      fontSize: 12,
+
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ),
 
-                              SizedBox(height: 4),
+                              const SizedBox(width: 12),
 
-                              Text(
-                                'Payment gateway will be connected later',
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
 
-                                style: TextStyle(color: diuGray, fontSize: 10),
+                                  children: [
+                                    Text(
+                                      'bKash',
+
+                                      style: TextStyle(
+                                        color: Color(0xFF111827),
+
+                                        fontSize: 14,
+
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+
+                                    SizedBox(height: 4),
+
+                                    Text(
+                                      'Payment gateway will be connected later',
+
+                                      style: TextStyle(
+                                        color: diuGray,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const Icon(
+                                Icons.check_circle_rounded,
+
+                                color: Color(0xFFE2136E),
                               ),
                             ],
                           ),
                         ),
-
-                        const Icon(
-                          Icons.check_circle_rounded,
-
-                          color: Color(0xFFE2136E),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
 
-              const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-              // ====================================================
-              // ORDER SUMMARY
-              // ====================================================
-              _sectionTitle('Order Summary', Icons.receipt_long_outlined),
+                    // ====================================================
+                    // ORDER SUMMARY
+                    // ====================================================
+                    _sectionTitle('Order Summary', Icons.receipt_long_outlined),
 
-              const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-              Container(
-                width: double.infinity,
+                    Container(
+                      width: double.infinity,
 
-                padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
 
-                decoration: BoxDecoration(
-                  color: Colors.white,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
 
-                  borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(16),
 
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
 
-                child: Column(
-                  children: [
-                    ...widget.cartItems.map((item) {
-                      final name = item['name']?.toString() ?? 'Product';
+                      child: Column(
+                        children: [
+                          ...widget.cartItems.map((item) {
+                            final name = item['name']?.toString() ?? 'Product';
 
-                      final price = getPrice(item['price']);
+                            final price = getPrice(item['price']);
 
-                      final quantityValue = item['quantity'] ?? 1;
+                            final quantityValue = item['quantity'] ?? 1;
 
-                      final quantity = quantityValue is num
-                          ? quantityValue.toInt()
-                          : int.tryParse(quantityValue.toString()) ?? 1;
+                            final quantity = quantityValue is num
+                                ? quantityValue.toInt()
+                                : int.tryParse(quantityValue.toString()) ?? 1;
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
 
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 42,
-
-                              height: 42,
-
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-
-                                borderRadius: BorderRadius.circular(9),
-                              ),
-
-                              child: const Icon(
-                                Icons.shopping_bag_outlined,
-
-                                color: diuBlue,
-
-                                size: 20,
-                              ),
-                            ),
-
-                            const SizedBox(width: 10),
-
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-
+                              child: Row(
                                 children: [
+                                  Container(
+                                    width: 42,
+
+                                    height: 42,
+
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+
+                                      borderRadius: BorderRadius.circular(9),
+                                    ),
+
+                                    child: const Icon(
+                                      Icons.shopping_bag_outlined,
+
+                                      color: diuBlue,
+
+                                      size: 20,
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 10),
+
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+
+                                      children: [
+                                        Text(
+                                          name,
+
+                                          maxLines: 1,
+
+                                          overflow: TextOverflow.ellipsis,
+
+                                          style: const TextStyle(
+                                            color: Color(0xFF111827),
+
+                                            fontSize: 12,
+
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 3),
+
+                                        Text(
+                                          '৳${price.toStringAsFixed(0)} × $quantity',
+
+                                          style: const TextStyle(
+                                            color: diuGray,
+
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
                                   Text(
-                                    name,
-
-                                    maxLines: 1,
-
-                                    overflow: TextOverflow.ellipsis,
+                                    '৳${(price * quantity).toStringAsFixed(0)}',
 
                                     style: const TextStyle(
                                       color: Color(0xFF111827),
 
                                       fontSize: 12,
 
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 3),
-
-                                  Text(
-                                    '৳${price.toStringAsFixed(0)} × $quantity',
-
-                                    style: const TextStyle(
-                                      color: diuGray,
-
-                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
+                            );
+                          }),
 
-                            Text(
-                              '৳${(price * quantity).toStringAsFixed(0)}',
+                          const Divider(height: 18),
 
-                              style: const TextStyle(
-                                color: Color(0xFF111827),
+                          _summaryRow(
+                            'Subtotal',
+                            '৳${widget.subtotal.toStringAsFixed(0)}',
+                          ),
 
-                                fontSize: 12,
+                          const SizedBox(height: 8),
 
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                          _summaryRow(
+                            'Delivery Fee',
+                            '৳${widget.deliveryFee.toStringAsFixed(0)}',
+                          ),
 
-                    const Divider(height: 18),
+                          const Divider(height: 24),
 
-                    _summaryRow(
-                      'Subtotal',
-                      '৳${widget.subtotal.toStringAsFixed(0)}',
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    _summaryRow(
-                      'Delivery Fee',
-                      '৳${widget.deliveryFee.toStringAsFixed(0)}',
-                    ),
-
-                    const Divider(height: 24),
-
-                    _summaryRow(
-                      'Total',
-                      '৳${widget.total.toStringAsFixed(0)}',
-                      bold: true,
+                          _summaryRow(
+                            'Total',
+                            '৳${widget.total.toStringAsFixed(0)}',
+                            bold: true,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
 
       // ============================================================
       // PLACE ORDER BUTTON
